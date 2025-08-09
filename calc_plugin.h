@@ -1,16 +1,27 @@
 #ifndef CALC_PLUGIN_H
 #define CALC_PLUGIN_H
 
-typedef double (*calc_func_t)(double a, double b);
+#include <stddef.h>
 
-// Structure every plugin must export
+typedef double (*calc_process_fn)(double param, double input);
+
 typedef struct {
-    const char *name;      // Plugin name (e.g., "add")
-    calc_func_t execute;   // Function to perform the calculation
+    const char *name;
+    calc_process_fn process;
+} calc_node_t;
+
+typedef struct {
+    calc_node_t nodes[128];  // registered operations
+    size_t node_count;       // number of registered nodes
+} calc_main_t;
+
+typedef struct {
+    const char *plugin_name;
+    const calc_node_t *nodes;
+    size_t node_count;
 } calc_plugin_t;
 
-// Registration macro (like VLIB_PLUGIN_REGISTER in VPP)
-#define REGISTER_PLUGIN(plugin_var) \
-    __attribute__((visibility("default"))) calc_plugin_t plugin_var
+#define REGISTER_PLUGIN(name) \
+    __attribute__((visibility("default"))) calc_plugin_t name
 
 #endif

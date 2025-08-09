@@ -1,10 +1,15 @@
 #include "calc_plugin.h"
 
-static double mul(double a, double b) {
-    return a * b;
+static double mul_fn(double param, double input) {
+    return input * param;
 }
 
+static const calc_node_t nodes_mul[] = {
+    { .name = "mul", .process = mul_fn }
+};
+
 REGISTER_PLUGIN(plugin) = {
-    .name = "mul",
-    .execute = mul
+    .plugin_name = "mul_plugin",
+    .nodes = nodes_mul,
+    .node_count = 1
 };

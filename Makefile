@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -fPIC -Wall -Wextra -O2
+CFLAGS = -Wall -Wextra -fPIC -O2
 LDFLAGS = -ldl
 
 all: calc_core plugin_add.so plugin_sub.so plugin_mul.so plugin_div.so

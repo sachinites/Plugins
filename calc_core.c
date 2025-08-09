@@ -1,50 +1,77 @@
+#include "calc_plugin.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
-#include "calc_plugin.h"
 
-#define MAX_PLUGINS 10
+#define MAX_NODES 128
 
-int main(int argc, char **argv) {
-    if (argc < 5) {
-        printf("Usage: %s <plugin1.so> <plugin2.so> ... <op_name> <a> <b>\n", argv[0]);
+static calc_main_t cm = { .node_count = 0 };
+
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <plugin.so>... start <initial_value> <op> <arg> ...\n", argv[0]);
         return 1;
     }
 
-    // Load plugins
-    calc_plugin_t *plugins[MAX_PLUGINS];
-    int plugin_count = 0;
-    int i;
+    int plugin_start_index = -1;
 
-    for (i = 1; i < argc - 3; i++) {
-        void *handle = dlopen(argv[i], RTLD_LAZY);
+    // Load plugins until "start"
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "start") == 0) {
+            plugin_start_index = i;
+            break;
+        }
+
+        void *handle = dlopen(argv[i], RTLD_NOW);
         if (!handle) {
-            fprintf(stderr, "Failed to load %s: %s\n", argv[i], dlerror());
+            fprintf(stderr, "dlopen(%s) failed: %s\n", argv[i], dlerror());
             return 1;
         }
 
-        calc_plugin_t *p = dlsym(handle, "plugin");
-        if (!p) {
-            fprintf(stderr, "Invalid plugin in %s\n", argv[i]);
+        calc_plugin_t *plugin = dlsym(handle, "plugin");
+        if (!plugin) {
+            fprintf(stderr, "dlsym(plugin) failed in %s: %s\n", argv[i], dlerror());
             return 1;
         }
 
-        plugins[plugin_count++] = p;
-    }
-
-    // Find requested operation
-    char *op_name = argv[argc - 3];
-    double a = atof(argv[argc - 2]);
-    double b = atof(argv[argc - 1]);
-
-    for (i = 0; i < plugin_count; i++) {
-        if (strcmp(plugins[i]->name, op_name) == 0) {
-            double result = plugins[i]->execute(a, b);
-            printf("Result: %.2f\n", result);
-            return 0;
+        for (size_t n = 0; n < plugin->node_count && cm.node_count < MAX_NODES; n++) {
+            cm.nodes[cm.node_count++] = plugin->nodes[n];
         }
     }
 
-    printf("Operation '%s' not found in loaded plugins.\n", op_name);
-    return 1;
+    if (plugin_start_index == -1 || plugin_start_index + 2 > argc) {
+        fprintf(stderr, "Missing 'start' token and value\n");
+        return 1;
+    }
+
+    double value = atof(argv[plugin_start_index + 1]);
+
+    // Process operations
+    for (int i = plugin_start_index + 2; i < argc; i += 2) {
+        if (i + 1 >= argc) {
+            fprintf(stderr, "Missing argument for operation '%s'\n", argv[i]);
+            return 1;
+        }
+
+        const char *op = argv[i];
+        double arg = atof(argv[i + 1]);
+        int found = 0;
+
+        for (size_t n = 0; n < cm.node_count; n++) {
+            if (strcmp(cm.nodes[n].name, op) == 0) {
+                value = cm.nodes[n].process(arg, value);
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            fprintf(stderr, "Unknown operation '%s'\n", op);
+            return 1;
+        }
+    }
+
+    printf("Result: %f\n", value);
+    return 0;
 }
